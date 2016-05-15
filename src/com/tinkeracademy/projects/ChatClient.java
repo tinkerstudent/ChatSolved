@@ -2,6 +2,7 @@ package com.tinkeracademy.projects;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.IOException;
 import java.util.List;
 
 import javax.swing.JButton;
@@ -21,12 +22,15 @@ public class ChatClient implements ActionListener {
 	
 	public JTextArea chatMessage;
 	
-	public ChatStatus initStatus = ChatStatus.NO;
-	
 	public ChatClient() {
 		chatService = new ChatService();
 	}
 	
+	/**
+	 * Main method with boiler plate code to create and show gui
+	 * 
+	 * @param args
+	 */
 	public static void main(String[] args) {
 		chat = new ChatClient();
 		javax.swing.SwingUtilities.invokeLater(new Runnable() {
@@ -36,6 +40,10 @@ public class ChatClient implements ActionListener {
 		});
 	}
 	
+	/**
+	 * Creates and shows the GUI
+	 * 
+	 */
 	public void createAndShowGUI() {
 		Window.show();
 		Window.addLabel("Chat Application Developed By: Tinker Academy v1.0");
@@ -43,70 +51,86 @@ public class ChatClient implements ActionListener {
 		chatMessage = Window.addTextArea("", 4, 10, true);
 		sendButton = Window.addButton("Send");
 		sendButton.addActionListener(this);
-		initStatus = chatService.initializeChatUserFile();
+		// Prompt for the user name the current user name is not registered on this computer,
+		// Else update the chat history panel
+		ChatStatus initStatus = chatService.initStatus;
 		if (initStatus == ChatStatus.ERROR) {
 			showError();
 		} else if (initStatus == ChatStatus.NO) {
 			promptChatUser();
 		} else if (initStatus == ChatStatus.YES) {
-			initChatHistory();
+			showChatHistory();
 		}
 	}
 
+	/* (non-Javadoc)
+	 * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
+	 */
 	@Override
-	public void actionPerformed(ActionEvent e) {
-		if (initStatus == ChatStatus.NO) {
-			initializeChatUser();
-		} else if (initStatus == ChatStatus.YES) {
-			postChatMessage();
-		} else if (initStatus == ChatStatus.ERROR) {
+	public void actionPerformed(ActionEvent e){
+		ChatStatus initStatus = chatService.initStatus;
+		try {
+			// Set the user name if the current user name is not registered on this computer,
+			// Else post the chat message to the network and update the chat history window
+			if (initStatus == ChatStatus.NO) {
+				setChatUser();
+			} else if (initStatus == ChatStatus.YES) {
+				addChatMessage();
+				showChatHistory();
+			} else if (initStatus == ChatStatus.ERROR) {
+				showError();
+			}
+		} catch(IOException ex) {
+			ex.printStackTrace();
 			showError();
 		}
 	}
 	
-	public void showError() {
-		chatMessage.setText(getErrorText());
-	}
-	
-	public void initializeChatUser() {
-		String chatName = chatMessage.getText();
+	/**
+	 * Sets the chat user name to the name the user entered on the chat window
+	 * 
+	 * @throws IOException
+	 */
+	public void setChatUser() throws IOException {
+		String userName = chatMessage.getText();
 		if (chat != null) {
-			chatName = chatName.trim();
+			userName = userName.trim();
 		}
-		if (chatName.length() > 0) {
-			ChatStatus setNameStatus = chatService.initializeChatUser(chatName);
+		if (userName.length() > 0) {
+			ChatStatus setNameStatus = chatService.setUser(userName);
 			if (setNameStatus == ChatStatus.ERROR) {
 				showError();
 			} else if (setNameStatus == ChatStatus.NO){
 				promptChatUser();
 			} else if (setNameStatus == ChatStatus.YES) {
 				chatMessage.setText(getChatPrompt());
-				initStatus = ChatStatus.YES;
+				chatService.initStatus = ChatStatus.YES;
 			}
 		} else {
 			chatMessage.setText(getUserNamePrompt());
 		}
 	}
 	
-	public void postChatMessage() {
+	/**
+	 * Adds the chat message to the list of chats
+	 * 
+	 */
+	public void addChatMessage() {
 		String msg = chatMessage.getText();
 		if (msg != null) {
 			msg = msg.trim();
 		}
 		if (msg.length() > 0) {
-			chatService.postChatMessage(msg);
-			updateChatHistory();
-			clearChatMessage();
+			chatService.addChatMessage(msg);
 		}
 		clearChatMessage();
 	}
 	
-	public void initChatHistory() {
-		updateChatHistory();
-		chatService.startService();
-	}
-	
-	public void updateChatHistory() {
+	/**
+	 * Shows the current list of chat messages in the chat history
+	 * 
+	 */
+	public void showChatHistory() {
 		List<String> chatLines = chatService.getChatHistory();
 		if (chatLines != null) {
 			StringBuffer buf = new StringBuffer();
@@ -116,6 +140,10 @@ public class ChatClient implements ActionListener {
 			}
 			chatHistory.setText(buf.toString());
 		}
+	}
+	
+	public void showError() {
+		chatMessage.setText(getErrorText());
 	}
 	
 	public String getErrorText() {
